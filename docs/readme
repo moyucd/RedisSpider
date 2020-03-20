@@ -16,8 +16,8 @@
 ### 项目代码结构
 
 ```
-ConstructionIndustrySpider
-├── ConstructionIndustrySpider
+RedisSpider
+├── RedisSpider
 │   ├── __init__.py
 │   ├── items
 │   │   ├── __init__.py
@@ -125,14 +125,14 @@ class YunnanZfcgNewsItem(BasicItem):
 
 ```json
 {
-    "url": "http://www.ggzy.gov.cn/",
+    "url": "https://www.baidu.com/",
     "proxy": false,
     "params": {
-        "deal_time": "01"
+        
     }
 }
 ```
 
 - url：指定站点，用于构造初始请求，该字段的值必须与 parse 中进行路由的值相同
 - proxy：设置初始请求是否需要使用代理
-- params：初始请求的解析回调所需要的额外参数，需要在站点的根 parse 函数中定义相应的入参，具体参考 nation_ggzy_parse。
+- params：初始请求的解析回调所需要的额外参数，需要在站点的根 parse 函数中定义相应的入参。
