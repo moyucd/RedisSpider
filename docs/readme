@@ -11,7 +11,7 @@
 
 ### 项目架构
 
-![项目架构图](./docs/建筑行业爬虫项目架构图.jpg)
+![项目架构图](./docs/课程爬虫项目架构图.jpg)
 
 ### 项目代码结构
 
@@ -74,8 +74,8 @@ ConstructionIndustrySpider
 　　下面是一个例子
 
 ```python
-# 全国公共资源交易平台 新闻 Item
-class NationGgzyNewsItem(BasicItem):
+# 云南资源交易平台 新闻 Item
+class YunnanZfcgNewsItem(BasicItem):
     date = Field() # 新闻日期
     title = Field() # 新闻标题
     content = Field() # 新闻内容
@@ -84,7 +84,7 @@ class NationGgzyNewsItem(BasicItem):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self['collection'] = 'nation_ggzy_news'
+        self['collection'] = 'yunnan_zfcg_news'
         self['images'] = []
         self['files'] = []
 
