@@ -1,0 +1,138 @@
+## Redis Spider 课程设计爬虫  
+
+
+### 项目依赖 
+
+- Python 3.7.5
+- Scrapy 1.8.0
+- scrapy-redis 0.6.8
+- pymongo 3.9.0
+
+
+### 项目架构
+
+![项目架构图](./docs/建筑行业爬虫项目架构图.jpg)
+
+### 项目代码结构
+
+```
+ConstructionIndustrySpider
+├── ConstructionIndustrySpider
+│   ├── __init__.py
+│   ├── items
+│   │   ├── __init__.py
+│   │   └── basic_item.py
+│   ├── main.py
+│   ├── middlewares.py
+│   ├── pipelines.py
+│   ├── settings.py
+│   ├── spiders
+│   │   ├── __init__.py
+│   │   └── main.py
+│   │   └── parsers
+│   │       └── __init__.py
+│   └── utils
+│       └── __init__.py
+├── readme.md
+└── scrapy.cfg
+```
+
+- spiders：整个项目只有一个 spider，不同域名的解析函数由 parse 函数进行路由
+
+- parser：各个域名的解析函数，一个域名一个文件，文件的命名规则为 省份_域名，文件中解析函数的命名开头必须与文件名相同，文件中还需要给出该域名的 allowed_domains
+
+- items：各个域名的 item 类，一个域名一个文件，命名规则与 parser 相同，所有类必须继承 BasicItem
+
+- utils：工具函数，命名规则与 parser 相同
+
+- pipelines：目前只有 MongoDB 存储的 Pipeline
+
+- middlewares: 目前只有代理的中间件，当某个请求需要代理时，在 meta 中设置 proxy_enable 为 True
+
+- settings.py：配置文件，如果 redis 和 mongodb 需要登录，在该文件中给出账号密码等数据
+
+### Documentation
+
+#### [Scrapy]( https://docs.scrapy.org/en/latest/)　[Scrapy-Redis](https://github.com/rmax/scrapy-redis)　[MongoDB]( https://docs.mongodb.com/manual/ )
+
+#### Spider
+
+　　项目只有 mainSpider，spider 会轮询获取 start_urls 中的 json，并根据 json 的值及其在有序集中的权重来构造初始请求。初始请求执行的解析回调在 parse 中根据 url 进行路由。
+
+#### Parser
+
+　　各个站点的解析方法都在 parser 中，一个站点一个文件。
+
+　　因为各解析方法都需要作为  MainSpider 类的实例方法才能使用，所以 parser 会在 \_\_init\_\_.py 中将所有文件里的属性和函数全部导入，并通过 \_\_all\_\_ 暴露出需要的函数，最后在 MainSpider 中将这些函数作为类的实例方法导入。parser 会根据各文件名和函数名来找出需要导入到 MainSpider 中的函数，所有**以文件名开头的函数**都会被暴露出来。此外还会将各文件下的 allowed_doamins 合并并导入到 MainSpider中。
+
+#### Item Pipeline
+
+　　一个 Item 就是一张表，所有 Item 必须继承 BasicItem 父类，该类包含了必须的字段（url、原始数据raw_data、最后更新时间last_updated、最后爬取时间last_crawled、表名collection）。
+
+　　图片和文件的存储都使用 GridFS，所有图片一张表，所有文件一张表，文章与图片、文件的以 url 作为外键进行关联。图片存储使用 ImageItem，该类只有 图片地址url 和 图片数据data 两个字段。文件存储使用 FileItem，该类有 文件地址url、文件名filename 和 文件数据data 三个字段。处理图片和文件时只需要调用 download_image 和 download_file 方法作为回调。
+
+　　下面是一个例子
+
+```python
+# 全国公共资源交易平台 新闻 Item
+class NationGgzyNewsItem(BasicItem):
+    date = Field() # 新闻日期
+    title = Field() # 新闻标题
+    content = Field() # 新闻内容
+    images = Field() # 新闻图片，一个列表存图片 url
+    files = Field() # 附件，一个列表存文件 url 和文件名
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self['collection'] = 'nation_ggzy_news'
+        self['images'] = []
+        self['files'] = []
+
+''' 在 mongodb 中存储的内容
+{
+	"_id": "5dfb2ef31235a3a521f81685",
+	"url": "http://www.ggzy.gov.cn/info/news/2016-03/22/content_2e80f90a4de64ae7957bcf61d29dd0fc.shtml",
+	"title": "国家发展改革委部署开展公共资源交易平台整合试点"
+	"content": '<div class="cmsdiv">......',
+	"date": "2016-03-22",
+	"files": [{
+		"url": "http://www.ggzy.gov.cn/info/news/2016-03/22/2e80f90a4de64ae7957bcf61d29dd0fc/files/0950972f535c43df86aae9f164a549b5.doc", 
+		"filename": "关于开展公共资源交易平台整合试点工作的通知.doc"
+	}],
+	"images": ["http://www.ggzy.gov.cn/info/news/2016-03/22/2e80f90a4de64ae7957bcf61d29dd0fc/images/67dfa9570a124cd081a663064ad6fc83.gif"],
+	"raw_data": "<!doctype html>......"
+	"last_crawled": "2019-12-19 16:04:03",
+	"last_updated": "2019-12-19 16:04:03"
+}
+'''
+```
+
+#### Proxy
+
+　　如果某个请求需要使用代理，只需要在请求中加上 meta={"proxy_enable": True} 即可
+
+#### Priority
+
+　　一个站点的初始请求优先级将作为该站点所有请求的基础优先级，所以请求中需要通过 meta 或者 cb_kwargs 来传递 domain_priority。子请求的优先级可以在基础优先级的基础上进行更细的优先级划分，所以各站点的基础优先级跨度可以设置的大一点。
+
+#### Duplicate Filter
+
+
+
+#### Run
+
+　　通过在 redis 的 start_urls 有序集中插入 json 来启动对某一站点的爬取， 插入的权重会作为该站点所有请求的基础优先级。json 用于指定爬取该站点的各种参数，具体格式如下：
+
+```json
+{
+    "url": "http://www.ggzy.gov.cn/",
+    "proxy": false,
+    "params": {
+        "deal_time": "01"
+    }
+}
+```
+
+- url：指定站点，用于构造初始请求，该字段的值必须与 parse 中进行路由的值相同
+- proxy：设置初始请求是否需要使用代理
+- params：初始请求的解析回调所需要的额外参数，需要在站点的根 parse 函数中定义相应的入参，具体参考 nation_ggzy_parse。
